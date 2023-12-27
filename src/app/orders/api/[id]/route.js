@@ -9,11 +9,13 @@ export async function GET(Request, { params }) {
         const client = await clientPromise;
         const db = client.db("qwe");
 
-        const stockById = await db
-            .collection("stock")
+        const order = await db
+            .collection("orders")
             .findOne({id: Long(id)});
+        console.log('order: ', order);
 
-        return NextResponse.json({ stockById });
+
+        return NextResponse.json(order);
     } catch (e) {
         return NextResponse("Something went wrong: " + e);
     }
@@ -31,17 +33,17 @@ export async function POST(req, { params }) {
 
         if (id === 'new') {
             const stockById = await db
-                .collection("stock")
+                .collection("orders")
                 .insertOne(data);
             console.log('stockById: ', stockById);
             const retId = await db
-                .collection("stock")
+                .collection("orders")
                 .findOne({_id: stockById.insertedId});
             console.log('retId: ', retId);
             return NextResponse.json({ retId });
         } else {
             const stockById = await db
-                .collection("stock")
+                .collection("orders")
                 .updateOne(
                     {id: Long(id)},
                     { $set: { ...data } });

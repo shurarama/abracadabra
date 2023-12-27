@@ -8,7 +8,7 @@ export async function GET(Request) {
         const db = client.db("qwe");
 
         const stock = await db
-            .collection("stock")
+            .collection("orders")
             .find({})
             .project({_id: 0, id: 1, name: 1 })
             .toArray();
@@ -28,7 +28,7 @@ export async function DELETE(req) {
         const db = client.db("qwe");
 
         const stockById = await db
-            .collection("stock")
+            .collection("orders")
             .deleteMany({id: {$in: data }});
         return NextResponse.json({ stockById });
     } catch (e) {
