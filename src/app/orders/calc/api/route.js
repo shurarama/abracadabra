@@ -1,9 +1,9 @@
-import clientPromise from "../../../../lib/mongodb";
+// import clientPromise from "../../../../lib/mongodb";
 import {NextResponse} from "next/server";
-import {Long} from "mongodb";
+// import {Long} from "mongodb";
 import {howToCutBoards1D} from "@/components/cutting-stock/1D";
 
-export async function POST(Request, { params }) {
+export async function POST(Request) {
     const data  = await Request.json();
     console.log('data: ', data);
 
