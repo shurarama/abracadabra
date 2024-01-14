@@ -76,6 +76,31 @@ export function howManyWays1D(
     return results
 }
 
+export function howManyWays(
+    curSize: number,
+    cutSizes: Array<number>,
+    curCut: Array<number> = []
+): Array<Array<number>>
+{
+    const localSizes = [...cutSizes];
+    let results: Array<Array<number>> = [];
+
+    while (localSizes.length !== 0) {
+        let cutSize = localSizes[0];
+        if (curSize >= cutSize) {
+            let newCut = [...curCut, cutSize];
+            let newSize = curSize - cutSize;
+            if (cutSize < 600 / 3 && newSize >= cutSize) {
+                results.push(...howManyWays(newSize, localSizes, newCut));
+            } else {
+                results.push(newCut, ...howManyWays(newSize, localSizes, newCut));
+            }
+        }
+        localSizes.shift();
+    }
+    return results
+}
+
 /**
  * Given a stock side of wood you and buy, how many do I need and how do I cut it
  * in order to make enough pieces of with at the given sizes.
@@ -88,7 +113,11 @@ export function howToCutBoards1D(args: {
     const { stockSizes, bladeSize, requiredCuts } = args
     const cutSizes = requiredCuts.map(({ size }) => size)
 
+    cutSizes.sort((a, b) => { return b - a; });
     const waysOfCuttingStocks = stockSizes.map(({ size, cost }) => {
+
+        // const newWays = howManyWays(size, cutSizes);
+
         const waysOfCutting = howManyWays1D({
             size: size,
             cuts: cutSizes,
@@ -109,6 +138,21 @@ export function howToCutBoards1D(args: {
             return stockCut
         })
 
+        // const newVersions = newWays.map(way => {
+        //     const stockCut = {}
+        //     for (const cut of cutSizes) {
+        //         stockCut["cut" + cut] = 0
+        //     }
+        //     let waySize = 0;
+        //     for (const cut of way) {
+        //         waySize += cut;
+        //         stockCut["cut" + cut] = stockCut["cut" + cut] + 1
+        //     }
+        //     // stockCut["remainder"] = stockSize - _.sum(way)
+        //     let wayCost = Math.ceil(Math.pow((waySize / size), 0.9) * 1000);
+        //     return {stockCut: stockCut, wayCost: wayCost};
+        // })
+
         return { size, cost, versions, waysOfCutting }
     })
 
@@ -119,6 +163,7 @@ export function howToCutBoards1D(args: {
         waysOfCuttingStocks.map(({ size, cost, versions }) =>
             versions.map((cut, index) => ({
                 [size + "version" + index]: { ...cut, cost: cost },
+                // [size + "version" + index]: { ...cut.stockCut, "cost": cut.wayCost },
             }))
         )
     ).reduce((acc, next) => ({ ...acc, ...next }))
@@ -157,9 +202,11 @@ export function howToCutBoards1D(args: {
         throw new Error("Didn't work")
     }
 
-    const resultCuts: ResultCuts1D = []
+    let resultCuts: ResultCuts1D = []
 
+    // for (const { size, cost, newWays } of waysOfCuttingStocks) {
     for (const { size, cost, waysOfCutting } of waysOfCuttingStocks) {
+        // for (let i = 0; i < newWays.length; i++) {
         for (let i = 0; i < waysOfCutting.length; i++) {
             const number = results[size + "version" + i]
             if (number !== undefined && number > 0) {
@@ -173,10 +220,108 @@ export function howToCutBoards1D(args: {
                     count: Math.ceil(number),
                     decimal: number,
                     cuts: waysOfCutting[i],
+                    // cuts: newWays[i],
                 })
             }
         }
     }
 
-    return resultCuts
+    resultCuts.sort((a, b) => a.count - b.count);
+    for (const needCut of requiredCuts) {
+        let resultCountOfCut = 0;
+        for (const resultCut of resultCuts) {
+            for (const sizeOfCut of resultCut.cuts) {
+                if (needCut.size == sizeOfCut) resultCountOfCut += resultCut.count;
+            }
+        }
+        console.log(resultCountOfCut);
+        let needErase = resultCountOfCut - needCut.count;
+        if (needErase > 0) {
+            for (const resultCut of resultCuts) {
+                let countOfCutInCurWay = 0;
+                for (const sizeOfCut of resultCut.cuts) {
+                    if (needCut.size == sizeOfCut) countOfCutInCurWay ++;
+                }
+                if (countOfCutInCurWay > 0) {
+                    let countOfCutInCurRes = countOfCutInCurWay * resultCut.count;
+                    let needEraseFromThisRes = countOfCutInCurRes > needErase ? needErase : countOfCutInCurRes;
+                    needErase -= needEraseFromThisRes;
+                    while (needEraseFromThisRes > 0) {
+                        let CountOfModifiedCutsOfWay = needEraseFromThisRes > countOfCutInCurWay ? Math.floor(needEraseFromThisRes / countOfCutInCurWay) : 1;
+                        const curEraseCountPerWay = needEraseFromThisRes > countOfCutInCurWay ? countOfCutInCurWay : needEraseFromThisRes;
+                        resultCut.count -= CountOfModifiedCutsOfWay;
+                        let erasedCount = 0;
+                        let newCuts = resultCut.cuts.filter((size) => {
+                            if (size == needCut.size && erasedCount < curEraseCountPerWay) {
+                                erasedCount++;
+                                return false;
+                            }
+                            return true;
+                        });
+                        const found = resultCuts.findIndex((resCut) => {
+                            return resCut.cuts.sort().toString() === newCuts.sort().toString();
+                        })
+                        if (found !== -1) {
+                            resultCuts[found].count += CountOfModifiedCutsOfWay;
+                        } else {
+                            resultCuts.push({...resultCut, count: CountOfModifiedCutsOfWay, cuts: newCuts })
+                        }
+                        needEraseFromThisRes -= CountOfModifiedCutsOfWay * curEraseCountPerWay;
+                    }
+                    console.log(countOfCutInCurWay);
+                }
+                if (needErase == 0) break;
+            }
+        }
+    }
+    resultCuts = resultCuts.filter( (resultCut) => {
+        return resultCut.count > 0
+    });
+    let resWasModified = true;
+
+    while (resWasModified)
+    {
+        resWasModified = false;
+
+        resultCuts.sort((a, b) => a.cuts.reduce((ps, s) => ps + s) - b.cuts.reduce((ps, s) => ps + s));
+        for (var i = 0; i < resultCuts.length; i++ ) {
+            const sizeOfReplacedSet = resultCuts[i].cuts.reduce((ps, s) => ps + s);
+            const countOfReplacedSet = resultCuts[i].count;
+            for (var j = resultCuts.length - 1; j >= 0 && j > i && resultCuts[i].count > 0; j--) {
+                const freeSpaceInSet = resultCuts[j].stock.size - resultCuts[j].cuts.reduce((ps, s) => ps + s);
+                if (freeSpaceInSet >= sizeOfReplacedSet) {
+                    const countOfSetWithFreeSpace = resultCuts[j].count;
+                    const canPlaceInOneStock = Math.floor(freeSpaceInSet / sizeOfReplacedSet);
+                    const placeInOneStock = canPlaceInOneStock > countOfReplacedSet
+                        ? countOfReplacedSet
+                        : canPlaceInOneStock;
+                    const countForModify = placeInOneStock * countOfSetWithFreeSpace > countOfReplacedSet
+                        ? Math.floor(countOfReplacedSet / placeInOneStock)
+                        : countOfSetWithFreeSpace;
+                    let newCuts = resultCuts[j].cuts;
+                    for (let z = 0; z < placeInOneStock; z++)
+                        newCuts = [...newCuts, ...resultCuts[i].cuts];
+                    if (countForModify == countOfSetWithFreeSpace) {
+                        resultCuts[j].cuts = newCuts;
+                    } else { // countForModify < countOfSetWithFreeSpace
+                        resultCuts[j].count -= countForModify;
+                        resultCuts.push({...resultCuts[j], count: countForModify, cuts: newCuts });
+                        resWasModified = true;
+                    }
+                    resultCuts[i].count -= countForModify * placeInOneStock;
+                }
+            }
+        }
+        resultCuts = resultCuts.filter( (resultCut) => {
+            if (resultCut.count == 0) {
+                resWasModified = true;
+                return false;
+            }
+            return true;
+        });
+
+    }
+
+    return resultCuts;
+
 }

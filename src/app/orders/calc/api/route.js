@@ -11,9 +11,9 @@ export async function POST(Request, { params }) {
     console.log(inputs);
     data.map((input) => {
         if (inputs.has(input.name)) {
-            inputs.set(input.name, [...inputs.get(input.name), {size: input.size, count: input.count}])
+            inputs.set(input.name, [...inputs.get(input.name), {size: parseInt(input.size), count: parseInt(input.count)}])
         } else {
-            inputs.set(input.name, [{size: input.size, count: input.count}]);
+            inputs.set(input.name, [{size: parseInt(input.size), count: parseInt(input.count)}]);
 
         }
     });
